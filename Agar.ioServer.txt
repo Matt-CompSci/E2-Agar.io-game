@@ -1,0 +1,125 @@
+@name Agar.io Server
+@inputs [EGP]:wirelink
+@inputs [User]:entity
+@persist [Data]:gtable
+@persist [FoodCount]:number Ran:number
+
+if(first())
+{
+    entity():setAlpha(0)
+    
+    entity():createWire(entity():isWeldedTo(), "EGP", "wirelink")
+    
+    Data = gTable("Agar", 1)
+    Data:clear()
+    
+    Data["Cells", table] = table()
+    Data["Food", table] = table()
+    
+    for(I = 1, 10)
+    {
+        Data["Food", table][I, table] = table()
+    }
+    
+    foreach(K:number, V:table = Data["Food", table])
+    {
+        V["Pos", vector2] = floor(randvec2(1, 512))
+        V["Color", vector] = floor(randvec(1, 255))
+        V["Removed", number] = 0
+    }
+    
+    function number circleIntersection(V1:vector2, V2:vector2, Radius:number)
+    {
+        return V1:distance(V2) < Radius
+    }
+}
+
+elseif(clk("interval"))
+{
+    EGP:egpClear()
+    
+    EGP:egpClear()
+    
+    EGP:egpLine(1, vec2(0, 128), vec2(512, 128))
+    
+    EGP:egpText(2, "Agar.io Server", vec2(256, 64))
+    EGP:egpAlign(2, 1, 1)
+    EGP:egpSize(2, 42)
+    EGP:egpFont(2, "Courier New")
+    
+    EGP:egpLine(3, vec2(256, 128), vec2(256, 512))
+    EGP:egpLine(4, vec2(0, 170), vec2(512, 170))
+    
+    
+    EGP:egpText(5, "Name", vec2(128, 150))
+    EGP:egpAlign(5, 1, 1)
+    EGP:egpSize(5, 32)
+    EGP:egpFont(5, "Courier New")
+    
+    EGP:egpText(6, "Score", vec2(384, 150))
+    EGP:egpAlign(6, 1, 1)
+    EGP:egpSize(6, 32)
+    EGP:egpFont(6, "Courier New")
+    
+    ID = EGP:egpNumObjects() + 1
+    
+    Position = 0
+    
+    foreach(K:number, V:table = Data["Cells", table])
+    {
+        
+        if(!V["Removed", number])
+        {
+            Name = V["PlyName", string]
+            Score = V["Score", number]
+            
+            EGP:egpText(ID, Name, vec2(128, 200 + Position * 25))
+            EGP:egpAlign(ID, 1, 1)
+            ID++
+            Position++
+            
+            EGP:egpText(ID, "" + Score, vec2(384, 200 + (Position - 1) * 25))
+            EGP:egpAlign(ID, 1, 1)
+            ID++
+            Position++
+
+            
+            foreach(J:number, T:table = Data["Cells", table])
+            {
+                if(T["Size", vector2]:x() > V["Size", vector2]:x() * 1.4)
+                {
+                    if(circleIntersection(T["Pos", vector2], V["Pos", vector2], V["Size", vector2]:x()))
+                    {
+                        dsSend("RemovePlayer", "Agar.io", 2, V["ObjID", number])
+                        dsSend("GameOver", "Agar.io", 2, K)
+                        V["Removed", number] = 1
+                    }
+                }
+            }
+            
+            foreach(J:number, T:table = Data["Food", table])
+            {
+                if(!T["Removed", number] & circleIntersection(T["Pos", vector2], V["Pos", vector2], V["Size", vector2]:x()))
+                {
+                    V["Score", number] = V["Score", number] + 10
+                    V["Size", vector2] = vec2(clamp(V["Size", vector2]:x() + 1, 0, 100))
+                    T["Removed", number] = 1
+                }
+            }
+        }
+        
+        foreach(K:number, V:table = Data["Food", table])
+        {
+            if(V["Removed", number])
+            {
+                V["Pos", vector2] = floor(randvec2(1, 512))
+                V["Color", vector] = floor(randvec(1, 255))
+                V["Removed", number] = 0
+            }
+        }
+    }
+}
+
+interval(250)
+
+
