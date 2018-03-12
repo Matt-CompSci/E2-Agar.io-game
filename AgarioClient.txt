@@ -1,0 +1,258 @@
+@name Agar.io Client
+@inputs [EGP]:wirelink
+@inputs [User]:entity
+@persist [CurUser]:entity
+@persist [Data]:gtable
+@persist [Playing WelcomeID]:number Printed:number
+
+if(first())
+{
+    entity():setAlpha(0)
+    entity():createWire(entity():isWeldedTo(), "EGP", "wirelink")
+    entity():createWire(entity():isWeldedTo(), "User", "User")
+    
+    EGP:egpClear()
+    EGP:egpBox(1, vec2(256), vec2(512))
+    
+    
+    dsSetScope(2)
+    dsJoinGroup("Agar.io")
+    Data = gTable("Agar", 1)
+    
+    for(I = 0, 10)
+    {
+        Obj = EGP:egpNumObjects() + 1
+        EGP:egpLine(Obj, vec2(I * 51.2, 0), vec2(I * 51.2, 512))
+        EGP:egpColor(Obj, vec(125))
+        
+        EGP:egpLine(Obj + 1, vec2(0, I * 51.2), vec2(512, I * 51.2))
+        EGP:egpColor(Obj + 1, vec(125))
+    }
+    
+    Obj = EGP:egpNumObjects() + 1
+    WelcomeID = Obj
+    
+    EGP:egpRoundedBox(Obj, vec2(256), vec2(384, 128))
+    EGP:egpColor(Obj, vec(0, 125, 255))
+    
+    EGP:egpText(Obj + 1, "Press E to Start!", vec2(256))
+    EGP:egpAlign(Obj + 1, 1, 1)
+    EGP:egpSize(Obj + 1, 42)
+    
+    runOnLast(1)
+    
+    function void addPlayer()
+    {
+        Data["Cells", table][entity():id(), table]["Pos", vector2] = vec2(256)
+        Data["Cells", table][entity():id(), table]["Size", vector2] = vec2(16)
+        Data["Cells", table][entity():id(), table]["Color", vector] = floor(randvec(1, 255))
+        
+        if(Data["Cells", table][entity():id(), table]["ObjID", number])
+        {
+            CurObj = Data["Cells", table][entity():id(), table]["ObjID", number]
+        }
+        
+        else
+        {
+            CurObj = EGP:egpNumObjects() + 1
+            Data["Cells", table][entity():id(), table]["ObjID", number] = CurObj
+        }
+
+        EGP:egpCircle(CurObj, vec2(256), vec2(16))
+        EGP:egpColor(CurObj, Data["Cells", table][entity():id(), table]["Color", vector])
+        EGP:egpText(CurObj + 1, Data["Cells", table][entity():id(), table]["PlyName", string], vec2(0))
+        EGP:egpSize(CurObj + 1, 32)
+        EGP:egpAlign(CurObj + 1, 1, 1)
+        EGP:egpColor(CurObj + 1, vec(125))
+        EGP:egpParent(CurObj + 1, CurObj)
+    }
+    
+    function void removePlayer()
+    {
+        dsSend("RemovePlayer", "Agar.io", 2, Data["Cells", table][entity():id(), table]["ObjID", number])
+        Data["Cells", table][entity():id(), table]["Removed", number] = 1
+        EGP:egpRemove(Data["Cells", table][entity():id(), table]["ObjID", number])
+        EGP:egpRemove(Data["Cells", table][entity():id(), table]["ObjID", number] + 1)
+    }
+    
+    function void createFoodObjects()
+    {
+        ID = EGP:egpNumObjects() + 1
+        
+        foreach(K:number, V:table = Data["Food", table])
+        {
+            EGP:egpCircle(ID, V["Pos", vector2], vec2(5))
+            EGP:egpColor(ID, V["Color", vector])
+            V["ObjID", number] = ID
+            ID++
+        }
+    }
+    
+    function number getMax()
+    {
+        N = 0
+        
+        foreach(K:number, V:table = Data["Cells", table])
+        {
+            N = max(N, V["ObjID", number])
+        }
+        
+        return N
+    }
+    
+    function void createPlayerObjects()
+    {
+        PostProcess = array()
+        
+        foreach(K:number, V:table = Data["Cells", table])
+        {
+            if(K != entity():id())
+            {
+                if(!V["Removed", number])
+                {
+                    local ID = V["ObjID", number]
+                    
+                    if(ID == 0)
+                    {
+                        PostProcess:pushNumber(K)
+                    }
+                    
+                    else
+                    {
+                        EGP:egpRemove(ID)
+                        
+                        EGP:egpCircle(ID, V["Pos", vector2], V["Size", vector2])
+                        EGP:egpColor(ID, V["Color", vector])
+                        
+                        EGP:egpText(ID + 1, V["PlyName", string], vec2(0))
+                        EGP:egpAlign(ID + 1, 1, 1)
+                        EGP:egpColor(ID + 1, vec(125))
+                        EGP:egpSize(ID + 1, 32)
+                        EGP:egpParent(ID + 1, ID)
+                    }
+                }
+            }
+        }
+        
+        foreach(K, V:number = PostProcess)
+        {
+            ID = EGP:egpNumObjects() + 1
+            EGP:egpCircle(ID, Data["Cells", table][K, table]["Pos", vector2], Data["Cells", table][K, table]["Size", vector2])
+            EGP:egpColor(ID, Data["Cells", table][K, table]["Color", vector])
+            
+            EGP:egpText(ID + 1, Data["Cells", table][K, table]["PlyName", string], vec2(0))
+            EGP:egpAlign(ID + 1, 1, 1)
+            EGP:egpColor(ID + 1, vec(125))
+            EGP:egpSize(ID + 1, 32)
+            EGP:egpParent(ID + 1, ID)
+            
+            Data["Cells", table][K, table]["ObjID", number] = ID
+        }
+    }
+
+}
+
+elseif(dsClk())
+{
+    if(dsClkName() == "RemovePlayer")
+    {
+        if(Playing)
+        {
+            if(Data["Cells", table][entity():id(), table]["ObjID", number] != dsGetNumber())
+            {
+                EGP:egpRemove(dsGetNumber())
+                EGP:egpRemove(dsGetNumber() + 1)
+            }
+        }
+    }
+    
+    elseif(dsClkName() == "GameOver")
+    {
+        if(dsGetNumber() == entity():id())
+        {
+            Playing = 0
+            reset()
+        }
+    }
+}
+
+elseif(last())
+{
+    Data["Cells", table][entity():id(), table]["Removed", number] = 1
+    removePlayer()
+}
+
+elseif(inputClkName() == "User" & !Playing)
+{
+    EGP:egpRemove(WelcomeID)
+    EGP:egpRemove(WelcomeID + 1)
+    
+    if(Data["Cells", table][entity():id(), table]:count() == 0)
+    {
+        Data["Cells", table][entity():id(), table] = table()
+    }
+    
+    Data["Cells", table][entity():id(), table]["Removed", number] = 0
+    
+    Playing = 1
+    CurUser = User
+    
+    Data["Cells", table][entity():id(), table]["PlyName", string] = CurUser:name()
+    Data["Cells", table][entity():id(), table]["Score", number] = 0
+    
+    createFoodObjects()
+    createPlayerObjects()
+    addPlayer()
+    interval(150)
+    
+}
+
+if(clk("interval") & Playing)
+{
+    
+    CursorPos = EGP:egpCursor(CurUser)
+    ID = Data["Cells", table][entity():id(), table]["ObjID", number]
+    
+    if(CursorPos != vec2(-1, -1))
+    {
+        if(CursorPos:distance(EGP:egpPos(ID)) > 25)
+        {
+            Pos = EGP:egpPos(ID) + (CursorPos - EGP:egpPos(ID)):normalized() * 25
+            EGP:egpPos(ID, Pos)
+            Data["Cells", table][entity():id(), table]["Pos", vector2] = Pos
+        }
+    }
+    
+    foreach(K:number, V:table = Data["Cells", table])
+    {
+        if(!V["Removed", number])
+        {
+            if(EGP:egpHasObject(V["ObjID", number]))
+            {
+                EGP:egpPos(V["ObjID", number], V["Pos", vector2])
+                EGP:egpColor(V["ObjID", number], V["Color", vector])
+                EGP:egpSize(V["ObjID", number], V["Size", vector2])
+            }
+            
+            else
+            {
+                createPlayerObjects()
+            }
+        }
+    }
+    
+    foreach(K:number, V:table = Data["Food", table])
+    {
+        EGP:egpPos(V["ObjID", number], V["Pos", vector2])
+        EGP:egpColor(V["ObjID", number], V["Color", vector])
+    }
+    
+    if(CurUser:pos():distance(EGP:entity():pos()) > 300)
+    {
+        removePlayer()
+        reset()
+    }
+    
+    interval(150)
+}
+
